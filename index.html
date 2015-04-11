@@ -110,12 +110,13 @@
 						this.initMap(p);
 					},
 					resize: function(el,w,h) {
-						resizeMap(el,w,h);
+						this.resizeMap(el,w,h);
 					},
 					scope:this
 				},
 				tbar: {
 					toolbarCls: 'x-panel-fbar',
+					style: 'margin: 5px 0 5px 2px;',
 					 items: [{
 						xtype: 'tbtext',
 						text: 'Location Search:',
@@ -128,9 +129,8 @@
 								this.searchCombo
 							,{
 								xtype: 'button',
-								style: 'margin-left:2px;',
+								style: 'margin-left:4px;',
 								text: '<b>Clear</b>',
-								//flex: 1,
 								listeners: {
 									click: function(btn) {
 										this.clearSearchResults();
@@ -145,45 +145,6 @@
 		});
 		
 		
-		
-		
-		this.searchCombo.onTriggerClick = function(){
-		
-			if(this.isExpanded()){
-					this.collapse();
-					this.el.focus();
-			} else {
-				this.expand();
-				this.el.focus();
-
-				if(Ext.isEmpty(this.getValue())) {
-					this.store.removeAll();
-					performPlacemarkerSearch();
-				} else {
-
-				}
-			}
-
-		};
-				
-		
-		
-		function resizeMap(el,w,h) {
-			if (this.map!=null) {
-				if(h>0 && w>0) {
-					if (this.map!=null) {
-						var c=this.map.getDiv();
-						c.style.height=h+'px';
-						c.style.width=w+'px';
-					}
-					this.mapSize={width:w, height: h};
-				}
-				google.maps.event.trigger(this.map, 'resize');
-			} else {
-				this.mapSize={width:w, height: h};
-			}
-		
-		}
 		
 		function comboDoQueryOverride(cmb, q, forceAll) {
 			q = Ext.isEmpty(q) ? '' : q;
@@ -201,10 +162,9 @@
 			if(cmb.lastQuery !== q){
 				//Clear any previous search results
 				cmb.store.removeAll();
-				//performPlacemarkerSearch();
 				//If user has keyed in at least 3 chars then perform a Geocoder request
 				if(q.length > 2) {
-					performLocationSearch(q);
+					this.performLocationSearch(q);
 				}
 			} else {
 				cmb.onLoad();
@@ -221,63 +181,75 @@
 
 				if(Ext.isEmpty(cmb.getValue())) {
 					cmb.store.removeAll();
-					performPlacemarkerSearch();
-				} else {
-
 				}
 			}
 		}
 		
-		function performLocationSearch(text) {
-			var request = {
-				address: text,
-				bounds: this.map.getBounds(),
-				//Bias results to UK
-				region: 'uk'
-			};
-			this.mapGeocoder.geocode(request, locationSearchResultHandler);
-		}
 		
-		function performPlacemarkerSearch() {
-			console.log('performPlacemarkerSearch');
-		}
-		
-		function locationSearchResultHandler(results, status) {
-			if(results.length>0) {
-
-				var result;
-
-				for(var i=0; i<results.length; i++) {
-					result = results[i];
-					var rec = new this.findLocationRecord({
-						//Manually create a new ID here based on array idx
-						id: 'geocode-result-'+i,
-						Name: result.formatted_address,
-						Lat: result.geometry.location.lat(),
-						Lon: result.geometry.location.lng()
-					});
-
-					this.findLocationStore.add(rec);
-				}
-				this.searchCombo.onLoad();
-				// var nodes = this.searchCombo.view.getNodes();
-				// for (var i = 0; i < nodes.length; i++) {
-					// var n = nodes[i];
-					// var d = this.searchCombo.view.getRecord(n).data;
-					// var re = new RegExp('(.*?)(' + '' + Ext.escapeRe(this.searchCombo.getRawValue()) + ')(.*)', this.searchCombo.caseSensitive ? '' : 'i');
-					// var h = d[this.searchCombo.displayField];
-
-					// h = h.replace(re, '$1<span class="mark-combo-match">$2</span>$3');
-					// n.innerHTML = n.innerHTML.split("&nbsp;")[0] + "&nbsp;" + h;
-				// }
-			}
-		}
 		
 	});
 	
 	function initMap(p) {
 		this.map =  new google.maps.Map(p.body.dom, mapOptions);
 		this.mapGeocoder = new google.maps.Geocoder();
+	}
+	
+	function resizeMap(el,w,h) {
+		if (this.map!=null) {
+			if(h>0 && w>0) {
+				if (this.map!=null) {
+					var c=this.map.getDiv();
+					c.style.height=h+'px';
+					c.style.width=w+'px';
+				}
+				this.mapSize={width:w, height: h};
+			}
+			google.maps.event.trigger(this.map, 'resize');
+		} else {
+			this.mapSize={width:w, height: h};
+		}
+	
+	}
+	
+	function performLocationSearch(text) {
+		var request = {
+			address: text,
+			bounds: this.map.getBounds(),
+			//Bias results to UK
+			region: 'uk'
+		};
+		this.mapGeocoder.geocode(request, this.locationSearchResultHandler);
+	}
+	
+	function locationSearchResultHandler(results, status) {
+		if(results.length>0) {
+
+			var result;
+
+			for(var i=0; i<results.length; i++) {
+				result = results[i];
+				var rec = new this.findLocationRecord({
+					//Manually create a new ID here based on array idx
+					id: 'geocode-result-'+i,
+					Name: result.formatted_address,
+					Lat: result.geometry.location.lat(),
+					Lon: result.geometry.location.lng()
+				});
+
+				this.findLocationStore.add(rec);
+			}
+			this.searchCombo.onLoad();
+			// var nodes = this.searchCombo.view.getNodes();
+			// for (var i = 0; i < nodes.length; i++) {
+				// var n = nodes[i];
+				// var d = this.searchCombo.view.getRecord(n).data;
+				// var re = new RegExp('(.*?)(' + '' + Ext.escapeRe(this.searchCombo.getRawValue()) + ')(.*)', this.searchCombo.caseSensitive ? '' : 'i');
+				// var h = d[this.searchCombo.displayField];
+
+				// h = h.replace(re, '$1<span class="mark-combo-match">$2</span>$3');
+				// n.innerHTML = n.innerHTML.split("&nbsp;")[0] + "&nbsp;" + h;
+			// }
+		}
 	}
 	
 	function showResultOnMap(lat,lon,address) {
@@ -287,7 +259,6 @@
 					position: pos,
 					map: this.map,
 					labelContent: address,
-					//labelStyle: {opacity: 0.75},
 					labelClass: 'locationSearchResultLabel',
 					labelAnchor: new google.maps.Point(70, 0)
 			};
