@@ -4,15 +4,34 @@
     <title>Location Search Tool</title>
     <link rel="stylesheet" type="text/css" href="http://static.pinpointers.com/Lib/Sencha/Extjs/3.4.0/resources/css/ext-all.css"/>
 	<style>
-		.mark-combo-match {background-color:yellow;}
+		.mark-combo-match {
+			background-color:yellow;
+		}
+		.locationSearchResultLabel {
+			background-color: white;
+			font-family: "Lucida Grande", "Arial", sans-serif;
+			font-size: 12px;
+			font-weight: bold;
+			text-align: center;
+			width: 140px;
+			border: 1px solid black;
+			white-space: nowrap;
+			padding: 0px 2px 0px 2px;
+			text-overflow: ellipsis;
+			white-space: pre-wrap;      /* CSS3 */   
+			white-space: -moz-pre-wrap; /* Firefox */    
+			white-space: -pre-wrap;     /* Opera <7 */   
+			white-space: -o-pre-wrap;   /* Opera 7 */    
+			word-wrap: break-word;      /* IE */
+		}
 	</style>
-	<script type="text/javascript" src="http://static.pinpointers.com/Lib/Sencha/Extjs/3.4.3/adapter/ext/ext-base-debug.js"></script>
-	<script type="text/javascript" src="http://static.pinpointers.com/Lib/Sencha/Extjs/3.4.3/ext-all-debug.js"></script>
+	<script src="http://static.pinpointers.com/Lib/Sencha/Extjs/3.4.3/adapter/ext/ext-base-debug.js"></script>
+	<script src="http://static.pinpointers.com/Lib/Sencha/Extjs/3.4.3/ext-all-debug.js"></script>
+	
 	<script src="https://maps.googleapis.com/maps/api/js?v=3.exp"></script>
+	<script src="lib/markerwithlabel.js"></script>
 	<script>
-	Ext.onReady(function() {
-		
-		var map,
+	var map,
 		mapOptions = {
 			center: new google.maps.LatLng(51.067577, -1.795812),
 			zoom: 8
@@ -22,9 +41,9 @@
 		findLocationStore,
 		findLocationRecord,
 		searchCombo;
-		
-		//this.placemarkerStore = 
-		
+	
+	Ext.onReady(function() {
+	
 		this.findLocationStore = new Ext.data.JsonStore({
 			storeId: 'FindLocationStore',
             fields: [
@@ -69,7 +88,14 @@
 			emptyText: 'Start typing to search for a location...',
 			listEmptyText: 'Sorry no results were found',
 			width: 220,
-			listWidth: 300
+			listWidth: 300,
+			listeners: {
+				select: function(cmb, rec, idx) {
+					this.showResultOnMap(rec.get('Lat'), rec.get('Lon'), rec.get('Name'));
+				
+				},
+				scope:this
+			}
 		});
 		//Combo overrides...
 		this.searchCombo.doQuery = Ext.createDelegate(comboDoQueryOverride, this, [this.searchCombo], 0);
@@ -78,10 +104,10 @@
 		new Ext.Viewport({
 			layout: 'fit',
 			items: [{
-				html: 'Loading Map...',
+				html: '',
 				listeners: {
 					render: function(p) {
-						initMap(p);
+						this.initMap(p);
 					},
 					resize: function(el,w,h) {
 						resizeMap(el,w,h);
@@ -89,23 +115,28 @@
 					scope:this
 				},
 				tbar: {
+					toolbarCls: 'x-panel-fbar',
 					 items: [{
 						xtype: 'tbtext',
 						text: 'Location Search:',
-						style: 'font-weight:bold;'
+						style: 'font-weight:bold; font-size: 12px;'
 					 },{
 						xtype: 'container',
 						layout: 'hbox',
-						width: 250,
-						//id: 'locationSearchContainer',
+						width: 270,
 						items: [
 								this.searchCombo
 							,{
 								xtype: 'button',
-								iconCls: 'clear',
-								cls: 'x-toolbar-standardbutton',
-								flex: 1
-								//ref: '../btnClearFindLocation'
+								style: 'margin-left:2px;',
+								text: '<b>Clear</b>',
+								//flex: 1,
+								listeners: {
+									click: function(btn) {
+										this.clearSearchResults();
+									},
+									scope:this
+								}
 							}
 						]
 					}]
@@ -135,10 +166,7 @@
 
 		};
 				
-		function initMap(p) {
-			this.map =  new google.maps.Map(p.body.dom, mapOptions);
-			this.mapGeocoder = new google.maps.Geocoder();
-		}
+		
 		
 		function resizeMap(el,w,h) {
 			if (this.map!=null) {
@@ -173,7 +201,7 @@
 			if(cmb.lastQuery !== q){
 				//Clear any previous search results
 				cmb.store.removeAll();
-				performPlacemarkerSearch();
+				//performPlacemarkerSearch();
 				//If user has keyed in at least 3 chars then perform a Geocoder request
 				if(q.length > 2) {
 					performLocationSearch(q);
@@ -226,15 +254,11 @@
 						id: 'geocode-result-'+i,
 						Name: result.formatted_address,
 						Lat: result.geometry.location.lat(),
-						Lon: result.geometry.location.lng(),
-						IsPlacemarker: false,
-						MapIcon: null
+						Lon: result.geometry.location.lng()
 					});
 
 					this.findLocationStore.add(rec);
 				}
-
-				//this.appHub.raiseEvent('findlocationstoreloaded');
 				this.searchCombo.onLoad();
 				// var nodes = this.searchCombo.view.getNodes();
 				// for (var i = 0; i < nodes.length; i++) {
@@ -251,8 +275,40 @@
 		
 	});
 	
+	function initMap(p) {
+		this.map =  new google.maps.Map(p.body.dom, mapOptions);
+		this.mapGeocoder = new google.maps.Geocoder();
+	}
 	
+	function showResultOnMap(lat,lon,address) {
+		var pos = new google.maps.LatLng(lat, lon);
+		if(Ext.isEmpty(this.searchResultMarker)) {
+			var markerOptions = {
+					position: pos,
+					map: this.map,
+					labelContent: address,
+					//labelStyle: {opacity: 0.75},
+					labelClass: 'locationSearchResultLabel',
+					labelAnchor: new google.maps.Point(70, 0)
+			};
+
+			this.searchResultMarker = new MarkerWithLabel(markerOptions);			
+		} else {
+			this.searchResultMarker.setPosition(pos);
+			this.searchResultMarker.set('labelContent', address);
+			this.searchResultMarker.setMap(this.map);
+		}
+		this.map.setCenter(pos);
+		this.map.setZoom(16);
+	}
 	
+	function clearSearchResults() {
+		if(!Ext.isEmpty(this.searchResultMarker)) {
+			this.searchResultMarker.setMap(null);
+			this.searchCombo.store.removeAll();
+			this.searchCombo.reset();
+		}
+	}
 	
 	
 	
